@@ -1,26 +1,38 @@
 import pandas as pd
+import random
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics.pairwise import cosine_similarity
 
-data = {
-    "movie": [
-        "Dangal", "3 Idiots", "Pathaan", "Kabir Singh", "Gully Boy",
-        "War", "RRR", "Baahubali", "Drishyam", "PK",
-        "Bajrangi Bhaijaan", "KGF", "Jawan", "Animal", "Chennai Express"
-    ],
-    "genre_action": [0,0,1,0,0,1,1,1,0,0,0,1,1,1,0],
-    "genre_comedy": [0,1,0,0,0,0,0,0,0,1,1,0,0,0,1],
-    "genre_drama":  [1,1,0,1,1,0,1,1,1,1,1,1,0,1,0],
-    "duration": [161,170,146,173,153,156,182,159,163,153,163,156,169,201,141],
-    "year": [2016,2009,2023,2019,2019,2019,2022,2015,2015,2014,2015,2018,2023,2023,2013],
-    "rating": [8.4,8.4,5.9,7.0,7.9,6.5,7.8,8.0,8.2,8.1,8.0,8.2,7.0,6.8,6.2]
-}
+movies = [
+    ("Dangal", 0, 0, 1, 161, 2016, 8.4),
+    ("3 Idiots", 0, 1, 1, 170, 2009, 8.4),
+    ("Pathaan", 1, 0, 0, 146, 2023, 5.9),
+    ("Jawan", 1, 0, 0, 169, 2023, 7.0),
+    ("Animal", 1, 0, 1, 201, 2023, 6.8),
+    ("RRR", 1, 0, 1, 182, 2022, 7.8),
+    ("KGF 2", 1, 0, 1, 168, 2022, 8.3),
+]
 
-df = pd.DataFrame(data)
+for i in range(50):
+    movies.append((
+        f"Movie_{i}",
+        random.randint(0, 1),
+        random.randint(0, 1),
+        random.randint(0, 1),
+        random.randint(90, 180),
+        random.randint(2010, 2024),
+        round(random.uniform(5, 9), 1)
+    ))
 
-X = df[["genre_action", "genre_comedy", "genre_drama", "duration", "year"]]
+df = pd.DataFrame(movies, columns=[
+    "movie", "action", "comedy", "drama", "duration", "year", "rating"
+])
+
+
+features = ["action", "comedy", "drama", "duration", "year"]
+X = df[features]
 y = df["rating"]
-
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 model = LinearRegression()
@@ -28,21 +40,23 @@ model.fit(X_train, y_train)
 
 df["predicted_rating"] = model.predict(X)
 
+print("\nEnter your preferences:\n")
 
-recommendations = df.sort_values(by="predicted_rating", ascending=False)
+action = int(input("Action (1/0): "))
+comedy = int(input("Comedy (1/0): "))
+drama = int(input("Drama (1/0): "))
+duration = int(input("Duration: "))
+year = int(input("Year: "))
 
-print("\n🎬 Recommended Indian Movies:\n")
-print(recommendations[["movie", "predicted_rating"]])
+user_vector = [[action, comedy, drama, duration, year]]
 
-print("\n🎯 Try your own preference:")
+similarity_scores = cosine_similarity(user_vector, X)[0]
 
-action = int(input("Action? (1/0): "))
-comedy = int(input("Comedy? (1/0): "))
-drama = int(input("Drama? (1/0): "))
-duration = int(input("Preferred duration (minutes): "))
-year = int(input("Release year: "))
+df["similarity"] = similarity_scores
 
-user_input = [[action, comedy, drama, duration, year]]
+df["final_score"] = 0.6 * df["predicted_rating"] + 0.4 * df["similarity"] * 10
 
-pred = model.predict(user_input)
-print(f"\n⭐ Predicted Rating for your preference: {pred[0]:.2f}")
+recommendations = df.sort_values(by="final_score", ascending=False)
+
+print("\n🎬 Top Recommendations:\n")
+print(recommendations[["movie", "final_score"]].head(10))
